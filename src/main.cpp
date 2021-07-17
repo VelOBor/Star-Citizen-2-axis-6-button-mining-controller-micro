@@ -3,9 +3,9 @@
 */
 
 #include <Arduino.h> //make sure VSCode understands that this is an arduino sketch
-//#include <Joystick.h> //include the Joystick library
+#include <Joystick.h> //include the Joystick library
 
-//Joystick_ joystick; //create a joystick instance called "joystick"... Pretty inventive, huh...
+Joystick_ joystick; //create a joystick instance called "joystick"... Pretty inventive, huh...
 
 //define input pins for the pots
 int pot_a_pin = A2;
@@ -52,11 +52,14 @@ int pot_b_val= 0;
 
 
 
-
 //if you don't know what "void setup()" does - you probably shouldn't be reading this
 void setup() 
 {
-//joystick.begin();
+pot_a_val = 0;
+pot_b_val = 0;
+counter = 0;
+
+joystick.begin();
 
 //set pin modes for the local button pins
 pinMode(but1pin, INPUT_PULLUP);
@@ -73,19 +76,31 @@ Serial.begin(115200); //initialize serial comms for debugging
 //you should know what "void loop()" does
 void loop() 
 {
+softbut7state = 0;
+softbut8state = 0;
 
-    
   //read pots
-  pot_a_val = analogRead(pot_a_pin);
+  pot_a_val = analogRead(pot_a_pin) / 20;
   pot_b_val = map(analogRead(pot_b_pin), 0, 1023, 1023, 0);
 
   //convert pot a reading into button presses
-  pot_a_val_prev = pot_a_val;
-  pot_a_pulse = pot_a_val_prev / 140;
-  //pot_a_pulse_prev = pot_a_pulse;
-  if (pot_a_pulse > pot_a_pulse_prev){softbut7state = 1, softbut8state = 0;}
-  else if (pot_a_pulse < pot_a_pulse_prev){softbut8state = 1, softbut7state = 0;}
+  pot_a_pulse = pot_a_val_prev - pot_a_val;
+  if (pot_a_pulse < 0)
+  {
+    softbut7state = 1;
+    //delay(15); //give the game enough time to poll the inputs
+  }
+  else if (pot_a_pulse > 0)
+  {
+    softbut8state = 1;
+    //delay(15); //give the game enough time to poll the inputs
+  }
+  else /*if (pot_a_pulse = 0) */{softbut7state = 0, softbut8state = 0;}
   
+  pot_a_val_prev = pot_a_val;
+  counter = counter + softbut7state;
+  counter = counter - softbut8state;
+
   //read buttons (use the ! to invert the logic because of using PULLUP)
   but1state = !digitalRead(but1pin);
   but2state = !digitalRead(but2pin);
@@ -96,10 +111,10 @@ void loop()
   
   //tell the joystick library where to get the values for the axes
   //joystick.setXAxis(pot_a_val);
-  //joystick.setYAxis(pot_b_val);
+  joystick.setYAxis(pot_b_val);
   
   //tell the joystick library state of buttons
-	/*
+	
   if (but1state != but1laststate)
 	{
 	joystick.setButton(0, but1state);
@@ -130,7 +145,17 @@ void loop()
 	joystick.setButton(5, but6state);
 	but6laststate = but6state;
 	}
- */   
+  if (softbut7state != softbut7laststate) //software buttons from the pot values
+	{
+	joystick.setButton(6, softbut7state);
+	softbut7laststate = softbut7state;
+	}
+  if (softbut8state != softbut8laststate)
+	{
+	joystick.setButton(7, softbut8state);
+	softbut8laststate = softbut8state;
+	}
+    
 delay(5);
 
 //debugging - print remote pot values to screen...
@@ -144,6 +169,8 @@ delay(5);
   Serial.print(" b5s: "); Serial.print(but5state); 
   Serial.print(" b6s: "); Serial.print(but6state);
   Serial.print(" potapulse: "); Serial.print(pot_a_pulse);
+  Serial.print (" pulse counter: "); Serial.print(counter);
   Serial.print(" softbut7state: "); Serial.print(softbut7state);
   Serial.print(" softbut8state: "); Serial.println(softbut8state);
+
 }
